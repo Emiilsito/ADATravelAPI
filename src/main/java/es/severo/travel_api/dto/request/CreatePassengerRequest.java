@@ -6,6 +6,5 @@ import jakarta.validation.constraints.Size;
 
 public record CreatePassengerRequest(
         @NotBlank @Size(min = 5, max = 20) String documentNumber,
-        @NotBlank String name,
         @Size(max = 1) String gender
 ) {}
