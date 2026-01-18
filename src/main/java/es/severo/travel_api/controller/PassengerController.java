@@ -6,6 +6,10 @@ import es.severo.travel_api.dto.request.CreatePassengerRequest;
 import es.severo.travel_api.dto.request.UpdatePassengerRequest;
 import es.severo.travel_api.service.PassengerService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -43,5 +47,11 @@ public class PassengerController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .header(HttpHeaders.LOCATION, "/passengers/" + created.id())
                 .body(created);
+    }
+
+    @GetMapping("/page")
+    public Page<PassengerDto> getPassengersPage(
+            @PageableDefault(page = 0, size = 8, sort = "documentNumber", direction = Sort.Direction.ASC) Pageable pageable) {
+        return passengerService.getPassengersPage(pageable);
     }
 }

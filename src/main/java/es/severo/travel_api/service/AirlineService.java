@@ -4,6 +4,7 @@ import es.severo.travel_api.domain.Airline;
 import es.severo.travel_api.dto.AirlineDto;
 import es.severo.travel_api.repository.AirlineRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -33,5 +34,13 @@ public class AirlineService {
 
     private AirlineDto toDto(Airline airline){
         return new AirlineDto(airline.getId(), airline.getCode(), airline.getName());
+    }
+
+    @Transactional
+    public List<AirlineDto> getAirlinesSorted(Sort sort) {
+        List<Airline> airlines = airlineRepository.findAll(sort);
+        return airlines.stream()
+                .map(this::toDto)
+                .toList();
     }
 }

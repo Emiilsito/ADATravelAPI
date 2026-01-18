@@ -6,6 +6,8 @@ import es.severo.travel_api.dto.request.CreatePassengerRequest;
 import es.severo.travel_api.dto.request.UpdatePassengerRequest;
 import es.severo.travel_api.repository.PassengerRepository;
 import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,5 +65,12 @@ public class PassengerService {
         return passengerRepository.findAll().stream()
                 .map(p -> new PassengerDto(p.getId(), p.getDocumentNumber(), p.getGender()))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<PassengerDto> getPassengersPage(Pageable pageable) {
+        Page<Passenger> page = passengerRepository.findAll(pageable);
+
+        return page.map(this::toDto);
     }
 }
