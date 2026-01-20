@@ -10,6 +10,7 @@ import es.severo.travel_api.domain.Airline;
 import es.severo.travel_api.domain.Airport;
 import es.severo.travel_api.domain.Flight;
 import es.severo.travel_api.domain.FlightStatus;
+import es.severo.travel_api.dto.AirlineFlightCountDto;
 import es.severo.travel_api.dto.FlightDto;
 import es.severo.travel_api.dto.request.CreateFlightRequest;
 import es.severo.travel_api.dto.request.UpdateFlightRequest;
@@ -152,6 +153,12 @@ public class FlightService {
                 flight.getBasePrice(), flight.getStatus(),
                 flight.getAirline().getCode(),
                 flight.getDepartureAirport().getCode(), flight.getArrivalAirport().getCode());
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<List<AirlineFlightCountDto>> getAirlineStats() {
+        List<AirlineFlightCountDto> stats = flightRepository.findAirlineFlightStats();
+        return stats.isEmpty() ? Optional.empty() : Optional.of(stats);
     }
 
 

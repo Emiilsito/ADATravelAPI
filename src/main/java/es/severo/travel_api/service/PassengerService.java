@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class PassengerService {
@@ -72,5 +73,10 @@ public class PassengerService {
         Page<Passenger> page = passengerRepository.findAll(pageable);
 
         return page.map(this::toDto);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PassengerDto> findByDoc(String doc) {
+        return passengerRepository.findByDocumentNumberIgnoreCase(doc).map(this::toDto);
     }
 }
