@@ -1,10 +1,11 @@
 package es.severo.travel_api.controller;
 
-import es.severo.travel_api.dto.AirlineFlightCountDto;
-import es.severo.travel_api.dto.FlightDto;
+import es.severo.travel_api.dto.*;
 import es.severo.travel_api.dto.request.CreateFlightRequest;
+import es.severo.travel_api.dto.request.CreateGroupBookingsRequest;
 import es.severo.travel_api.dto.request.UpdateFlightRequest;
 import es.severo.travel_api.dto.request.UpdateStatusFlightRequest;
+import es.severo.travel_api.service.BookingService;
 import es.severo.travel_api.service.FlightService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -12,22 +13,32 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.math.BigDecimal;
+import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 
 @Tag(name = "Flights", description = "Gestión de vuelos y estadísticas")
 @RestController
-@RequestMapping("/api/flights")
+@RequestMapping("/flights")
 public class FlightController {
 
     private final FlightService flightService;
+    private final BookingService bookingService;
 
-    public FlightController(FlightService flightService) {
+    public FlightController(FlightService flightService, BookingService bookingService) {
         this.flightService = flightService;
+        this.bookingService = bookingService;
     }
 
     @GetMapping("/all")
@@ -81,19 +92,47 @@ public class FlightController {
         return ResponseEntity.ok(flightService.updateStatusFlight(id, req));
     }
 
-    @Operation(summary = "Búsqueda por aeropuertos", description = "Filtra vuelos por códigos IATA de origen y destino.")
+    @Operation(summary = "Búsqueda avanzada de vuelos", description = "Buscador con filtros y paginación.")
     @GetMapping("/search")
-    public ResponseEntity<List<FlightDto>> search(
-            @Parameter(description = "IATA Origen", example = "MAD") @RequestParam(required = false, defaultValue = "") String from,
-            @Parameter(description = "IATA Destino", example = "BCN") @RequestParam String to) {
-        return ResponseEntity.ok(flightService.searchByAirports(from, to));
+    public ResponseEntity<Page<FlightSearchResultDto>> search(
+            @Parameter(description = "Origin IATA code", example = "ALC")
+            @RequestParam(required = false) @Pattern(regexp = "[A-Z]{3}") String from,
+
+            @Parameter(description = "Destination IATA code", example = "BCN")
+            @RequestParam(required = false) @Pattern(regexp = "[A-Z]{3}") String to,
+
+            @RequestParam(required = false) LocalDate dateFrom,
+            @RequestParam(required = false) LocalDate dateTo,
+            @RequestParam(required = false) @Min(0) BigDecimal minPrice,
+            @RequestParam(required = false) @Min(0) BigDecimal maxPrice,
+
+            @Parameter(hidden = true) Pageable pageable
+    ) {
+        return ResponseEntity.ok(flightService.search(from, to, dateFrom, dateTo, minPrice, maxPrice, pageable));
+    }
+
+    @Operation(summary = "Crear reservas de grupo", description = "Crea reservas para un grupo de 2 a 6 pasajeros en un vuelo.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Reservas creadas"),
+            @ApiResponse(responseCode = "404", description = "Recurso no encontrado"),
+            @ApiResponse(responseCode = "409", description = "Conflicto en reserva")
+    })
+    @PostMapping("/{flightId}/bookings/group")
+    public ResponseEntity<GroupBookingsResultDto> createGroupBooking(
+            @PathVariable Long flightId,
+            @Valid @RequestBody CreateGroupBookingsRequest request) {
+
+        GroupBookingsResultDto result = bookingService.createGroupBooking(flightId, request);
+
+        URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/flights/{id}/bookings/group/{ref}")
+                .buildAndExpand(flightId, result.groupRef())
+                .toUri();
+
+        return ResponseEntity.created(location).body(result);
     }
 
     @Operation(summary = "Estadísticas aerolíneas", description = "Total de vuelos operados por cada aerolínea.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Éxito"),
-            @ApiResponse(responseCode = "204", description = "Sin datos")
-    })
     @GetMapping("/statistics/airlines")
     public ResponseEntity<List<AirlineFlightCountDto>> getAirlineStats() {
         return flightService.getAirlineStats()

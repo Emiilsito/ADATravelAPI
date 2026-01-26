@@ -20,8 +20,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Optional<Booking> findByPassengerIdAndStatus(Long passengerId, BookingStatus status);
     Optional<Booking> findFirstByPassengerIdOrderByBookingDateTimeDesc(Long passengerId);
 
-    // --- Actividad 2 ---
     @Query("SELECT new es.severo.travel_api.dto.FlightBookingCountDto(b.flight.flightNumber, b.flight.departureDate, COUNT(b)) " +
             "FROM Booking b WHERE b.flight.departureDate = :date GROUP BY b.flight.flightNumber, b.flight.departureDate")
     List<FlightBookingCountDto> countBookingsByFlightOnDate(@Param("date") LocalDate date);
+
+    boolean existsByFlightIdAndPassengerIdAndStatusNot(Long flightId, Long passengerId, BookingStatus status);
+
+    @Query("""
+        SELECT COUNT(b) > 0 FROM Booking b
+        WHERE b.flight.id = :flightId
+        AND b.seat.seatNumber = :seatNumber
+        AND b.status IN ('CREATED', 'CONFIRMED')
+    """)
+    boolean isSeatOccupied(@Param("flightId") Long flightId, @Param("seatNumber") String seatNumber);
 }

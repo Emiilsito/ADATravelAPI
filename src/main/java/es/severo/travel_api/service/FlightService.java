@@ -1,17 +1,7 @@
 package es.severo.travel_api.service;
 
-//Beans, IoC, DI
-//Beans --> objeto, instancia
-//IoC --> Inversion of Control -->
-//DI --> Dependency Inyection
-//ApplicationContext
-
-import es.severo.travel_api.domain.Airline;
-import es.severo.travel_api.domain.Airport;
-import es.severo.travel_api.domain.Flight;
-import es.severo.travel_api.domain.FlightStatus;
-import es.severo.travel_api.dto.AirlineFlightCountDto;
-import es.severo.travel_api.dto.FlightDto;
+import es.severo.travel_api.domain.*;
+import es.severo.travel_api.dto.*;
 import es.severo.travel_api.dto.request.CreateFlightRequest;
 import es.severo.travel_api.dto.request.UpdateFlightRequest;
 import es.severo.travel_api.dto.request.UpdateStatusFlightRequest;
@@ -19,11 +9,15 @@ import es.severo.travel_api.repository.AirlineRepository;
 import es.severo.travel_api.repository.AirportRepository;
 import es.severo.travel_api.repository.BookingRepository;
 import es.severo.travel_api.repository.FlightRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,7 +39,7 @@ public class FlightService {
     @Transactional(readOnly = true)
     public List<FlightDto> findAll() {
         List<Flight> flights = flightRepository.findAll();
-        return flights.stream().map(flight -> toDto(flight)).toList();
+        return flights.stream().map(this::toDto).toList();
     }
 
     @Transactional
@@ -55,7 +49,6 @@ public class FlightService {
         }
         Flight f = flightRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"El vuelo " + id + " no existe"));
         f.setStatus(req.status());
-        //flightRepository.save(f);
         return toDto(f);
     }
 
@@ -94,12 +87,10 @@ public class FlightService {
     public FlightDto update(Long id, UpdateFlightRequest req) {
         Flight flight = flightRepository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        // Comprobar maestros (404)
         Airline airline = airlineRepository.findById(req.airlineId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Aerolínea no existe"));
         Airport dep = airportRepository.findById(req.departureAirportId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Origen no existe"));
         Airport arr = airportRepository.findById(req.arrivalAirportId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Destino no existe"));
 
-        // Comprobar duplicado (409)
         if (flightRepository.existsByFlightNumberAndDepartureDateAndIdNot(req.flightNumber(), req.departureDate(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Conflicto de vuelo");
         }
@@ -116,17 +107,16 @@ public class FlightService {
         flight.setArrivalAirport(arr);
 
         Flight s = flightRepository.save(flight);
-        return new FlightDto(s.getId(), s.getFlightNumber(), s.getDepartureDate(), s.getArrivalDate(), s.getDepartureTime(), s.getArrivalTime(), s.getDurationMinutes(), s.getBasePrice(), s.getStatus(), s.getAirline().getCode(), s.getDepartureAirport().getCode(), s.getArrivalAirport().getCode());
+        return toDto(s);
     }
 
     @Transactional(readOnly = true)
     public FlightDto findById(Long id) {
         if (id == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "El id es nulo");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El id es nulo");
         }
         return flightRepository.findById(id)
-                .map(flight -> toDto(flight))
+                .map(this::toDto)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No existe el vuelo " + id));
     }
 
@@ -138,12 +128,20 @@ public class FlightService {
     }
 
     @Transactional(readOnly = true)
-    public List<FlightDto> searchByAirports(String from, String to) {
-        List<Flight> flights = flightRepository.findByDepartureAirportCodeAndArrivalAirportCode(from, to);
+    public Page<FlightSearchResultDto> search(String from, String to, LocalDate dFrom, LocalDate dTo,
+                                              BigDecimal min, BigDecimal max, Pageable pageable) {
+        return flightRepository.searchFlights(from, to, dFrom, dTo, min, max, pageable);
+    }
 
-        return flights.stream()
-                .map(flight -> toDto(flight))
-                .toList();
+    @Transactional(readOnly = true)
+    public Page<FlightBookingStatsDto> getTopBookedFlights(LocalDate date, BookingStatus status, Pageable pageable) {
+        return flightRepository.findTopBookedFlights(date, status, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<List<AirlineFlightCountDto>> getAirlineStats() {
+        List<AirlineFlightCountDto> stats = flightRepository.findAirlineFlightStats();
+        return stats.isEmpty() ? Optional.empty() : Optional.of(stats);
     }
 
     private FlightDto toDto(Flight flight) {
@@ -154,12 +152,4 @@ public class FlightService {
                 flight.getAirline().getCode(),
                 flight.getDepartureAirport().getCode(), flight.getArrivalAirport().getCode());
     }
-
-    @Transactional(readOnly = true)
-    public Optional<List<AirlineFlightCountDto>> getAirlineStats() {
-        List<AirlineFlightCountDto> stats = flightRepository.findAirlineFlightStats();
-        return stats.isEmpty() ? Optional.empty() : Optional.of(stats);
-    }
-
-
 }
